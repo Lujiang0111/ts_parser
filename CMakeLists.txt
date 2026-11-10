@@ -98,8 +98,23 @@ add_custom_target(
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_prebuild)
 
 # 编译后操作
+set(COPY_CONF_CMD)
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/conf")
+    set(COPY_CONF_CMD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/conf"
+            "${bin_dir}"
+    )
+endif()
+
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E env python3 ${CMAKE_CURRENT_SOURCE_DIR}/postbuild.py --os_name ${os_name} --os_arch ${os_arch} --bin_dir ${bin_dir} --lib_base_dir ${postbuild_lib_base_dir} --libs ${postbuild_libs}
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/conf ${bin_dir}
+    COMMAND ${CMAKE_COMMAND} -E env python3
+        ${CMAKE_CURRENT_SOURCE_DIR}/postbuild.py
+        --os_name ${os_name}
+        --os_arch ${os_arch}
+        --bin_dir ${bin_dir}
+        --lib_base_dir ${postbuild_lib_base_dir}
+        --libs ${postbuild_libs}
+    ${COPY_CONF_CMD}
 )
