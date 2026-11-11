@@ -8,11 +8,12 @@ int main(int argc, char **argv)
 {
     std::shared_ptr<Application> app = std::make_shared<Application>();
 
-    if (!app->Init(L"My ImGui Tool", 1280, 800))
+    if (!app->Init(L"Ts Parser", 800, 600))
     {
         return 1;
     }
 
+    std::string file_name;
     while (app->ProcessMessages())
     {
         app->BeginFrame();
@@ -31,20 +32,19 @@ int main(int argc, char **argv)
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-        // 以后开发具体工具，主要修改这里和自己的业务模块。
-        ImGui::Begin("MainWindow", nullptr, flags);
+        // ImGui窗口定义
+        ImGui::Begin("Ts parser", nullptr, flags);
 
-        ImGui::Text("Win32 + DirectX 11 + Dear ImGui");
-
-        static int counter = 0;
-        if (ImGui::Button("点击我"))
+        if (ImGui::Button("打开文件"))
         {
-            ++counter;
+            file_name = app->OpenFileDialog();
         }
 
         ImGui::SameLine();
-        ImGui::Text("Counter: %d", counter);
 
+        ImGui::Text("%s", file_name.c_str());
+
+        // ImGui窗口定义结束
         ImGui::End();
 
         app->EndFrame();

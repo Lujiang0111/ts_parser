@@ -1,6 +1,7 @@
 ﻿#ifndef IMGUI_WIN32_DX11_APP_H_
 #define IMGUI_WIN32_DX11_APP_H_
 
+#include <string>
 #include <windows.h>
 #include <d3d11.h>
 
@@ -21,6 +22,9 @@ public:
 
     // 每帧 UI 绘制完成后调用一次。
     void EndFrame();
+
+    //打开文件封装
+    std::string OpenFileDialog();
 
 private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);
