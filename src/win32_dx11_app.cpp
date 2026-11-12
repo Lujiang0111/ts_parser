@@ -8,49 +8,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 
 constexpr wchar_t *kWindowClassName = L"SimpleImGuiDx11Window";
 
-static std::string Utf16ToUtf8(const std::wstring &utf16)
-{
-    if (utf16.empty())
-    {
-        return "";
-    }
-
-    // 计算 UTF-8 所需字节数
-    int size = WideCharToMultiByte(
-        CP_UTF8,
-        WC_ERR_INVALID_CHARS,
-        utf16.data(),
-        static_cast<int>(utf16.size()),
-        nullptr,
-        0,
-        nullptr,
-        nullptr);
-
-    if (size <= 0)
-    {
-        return "";
-    }
-
-    // 分配空间
-    std::vector<char> utf8(size + 1, 0);
-
-    // 执行转换
-    if (0 == WideCharToMultiByte(
-        CP_UTF8,
-        WC_ERR_INVALID_CHARS,
-        utf16.data(),
-        static_cast<int>(utf16.size()),
-        utf8.data(),
-        size,
-        nullptr,
-        nullptr))
-    {
-        return "";
-    }
-
-    return utf8.data();
-}
-
 Application::Application()
     : hwnd_(nullptr),
     hinstance_(nullptr),
@@ -126,8 +83,7 @@ bool Application::Init(const wchar_t *title, int width, int height)
         18.0f
     );
 
-    // 设置深色主题
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
 
     if (!ImGui_ImplWin32_Init(hwnd_))
     {
@@ -228,7 +184,7 @@ void Application::EndFrame()
     swap_chain_->Present(1, 0);
 }
 
-std::string Application::OpenFileDialog()
+std::wstring Application::OpenFileDialog()
 {
     wchar_t filename[MAX_PATH] = {};
 
@@ -242,10 +198,53 @@ std::string Application::OpenFileDialog()
 
     if (GetOpenFileNameW(&ofn))
     {
-        return Utf16ToUtf8(filename);
+        return filename;
     }
 
-    return "";
+    return L"";
+}
+
+std::string Application::Utf16ToUtf8(const std::wstring &utf16)
+{
+    if (utf16.empty())
+    {
+        return "";
+    }
+
+    // 计算 UTF-8 所需字节数
+    int size = WideCharToMultiByte(
+        CP_UTF8,
+        WC_ERR_INVALID_CHARS,
+        utf16.data(),
+        static_cast<int>(utf16.size()),
+        nullptr,
+        0,
+        nullptr,
+        nullptr);
+
+    if (size <= 0)
+    {
+        return "";
+    }
+
+    // 分配空间
+    std::vector<char> utf8(size + 1, 0);
+
+    // 执行转换
+    if (0 == WideCharToMultiByte(
+        CP_UTF8,
+        WC_ERR_INVALID_CHARS,
+        utf16.data(),
+        static_cast<int>(utf16.size()),
+        utf8.data(),
+        size,
+        nullptr,
+        nullptr))
+    {
+        return "";
+    }
+
+    return utf8.data();
 }
 
 bool Application::CreateDevice()

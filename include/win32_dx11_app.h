@@ -24,7 +24,10 @@ public:
     void EndFrame();
 
     //打开文件封装
-    std::string OpenFileDialog();
+    std::wstring OpenFileDialog();
+
+    // utf16转换为utf8
+    std::string Utf16ToUtf8(const std::wstring &utf16);
 
 private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);
