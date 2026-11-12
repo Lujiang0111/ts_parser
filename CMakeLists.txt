@@ -55,7 +55,7 @@ message(STATUS "os name=${os_name}, os arch=${os_arch}, build type=${CMAKE_BUILD
 # 指定目标的包含目录
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/imgui
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/app/imgui
     ${dep_dir}/include/lccl
 )
 

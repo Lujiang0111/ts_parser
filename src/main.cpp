@@ -1,8 +1,7 @@
 ﻿#include <memory>
 #include "imgui.h"
-#include "lccl/oss/fmt.h"
-#include "ts_parser.h"
-#include "win32_dx11_app.h"
+#include "app/utils.h"
+#include "app/win32_dx11_app.h"
 
 bool app_running = true;
 
@@ -23,8 +22,6 @@ struct MainCtx
 
     std::wstring file_path_w;
     std::string file_name;
-
-    std::shared_ptr<TsParser> ts_parser;
 };
 
 static std::string GetFileName(const std::string &file_path)
@@ -42,7 +39,7 @@ int main(int argc, char **argv)
 {
     std::shared_ptr<MainCtx> ctx = std::make_shared<MainCtx>();
 
-    std::shared_ptr<Application> app = std::make_shared<Application>();
+    std::shared_ptr<app::Application> app = std::make_shared<app::Application>();
     if (!app->Init(L"Ts Parser", 800, 600))
     {
         return 1;
@@ -73,17 +70,11 @@ int main(int argc, char **argv)
         {
             ctx->file_path_w = app->OpenFileDialog();
             ctx->file_name = GetFileName(app->Utf16ToUtf8(ctx->file_path_w));
-
-            ctx->ts_parser = std::make_shared<TsParser>();
-            if (!ctx->ts_parser->Init(ctx->file_path_w))
-            {
-                ctx->ts_parser = nullptr;
-            }
         }
 
         ImGui::SameLine();
 
-        ImGui::Text("%s", ctx->file_name.c_str());
+        app::ImGuiTextFmt("{}", ctx->file_name);
 
         // 左侧导航菜单
         ImGui::BeginChild("Sidebar", ImVec2(180, 0), true);

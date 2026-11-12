@@ -1,10 +1,12 @@
 ﻿#include <vector>
-#include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#include "win32_dx11_app.h"
+#include "app/win32_dx11_app.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
+
+namespace app
+{
 
 constexpr wchar_t *kWindowClassName = L"SimpleImGuiDx11Window";
 
@@ -433,4 +435,6 @@ LRESULT Application::HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LPAR
     }
 
     return DefWindowProcW(hwnd, message, w_param, l_param);
+}
+
 }

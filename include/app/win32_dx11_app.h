@@ -1,9 +1,12 @@
-﻿#ifndef IMGUI_WIN32_DX11_APP_H_
-#define IMGUI_WIN32_DX11_APP_H_
+﻿#ifndef IMGUI_APP_WIN32_DX11_APP_H_
+#define IMGUI_APP_WIN32_DX11_APP_H_
 
 #include <string>
 #include <windows.h>
 #include <d3d11.h>
+
+namespace app
+{
 
 class Application
 {
@@ -55,4 +58,6 @@ private:
     ID3D11RenderTargetView *render_target_;
 };
 
-#endif // !IMGUI_WIN32_DX11_APP_H_
+}
+
+#endif // !IMGUI_APP_WIN32_DX11_APP_H_
