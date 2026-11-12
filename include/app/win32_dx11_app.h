@@ -29,8 +29,7 @@ public:
     //打开文件封装
     std::wstring OpenFileDialog();
 
-    // utf16转换为utf8
-    std::string Utf16ToUtf8(const std::wstring &utf16);
+    std::wstring SaveFileDialog(const std::wstring &default_name = L"data");
 
 private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);

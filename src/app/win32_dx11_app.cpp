@@ -1,7 +1,8 @@
 ﻿#include <vector>
+#include "app/utils.h"
+#include "app/win32_dx11_app.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#include "app/win32_dx11_app.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
 
@@ -191,6 +192,7 @@ std::wstring Application::OpenFileDialog()
     wchar_t filename[MAX_PATH] = {};
 
     OPENFILENAMEW ofn = {};
+    ofn.hwndOwner = hwnd_;
     ofn.lStructSize = sizeof(ofn);
     ofn.lpstrFile = filename;
     ofn.nMaxFile = MAX_PATH;
@@ -206,47 +208,36 @@ std::wstring Application::OpenFileDialog()
     return L"";
 }
 
-std::string Application::Utf16ToUtf8(const std::wstring &utf16)
+std::wstring Application::SaveFileDialog(const std::wstring &default_name)
 {
-    if (utf16.empty())
+    wchar_t filename[MAX_PATH] = {};
+    wcsncpy_s(filename, MAX_PATH, default_name.c_str(), _TRUNCATE);
+
+    OPENFILENAMEW ofn = {};
+    ofn.hwndOwner = hwnd_;
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+
+    // 文件类型
+    ofn.lpstrFilter =
+        L"文本文件 (*.csv)\0*.csv\0"
+        L"所有文件 (*.*)\0*.*\0";
+
+    ofn.nFilterIndex = 1;
+
+    // 默认扩展名
+    ofn.lpstrDefExt = L"csv";
+
+    // 保存选项
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+
+    if (GetSaveFileNameW(&ofn))
     {
-        return "";
+        return filename;
     }
 
-    // 计算 UTF-8 所需字节数
-    int size = WideCharToMultiByte(
-        CP_UTF8,
-        WC_ERR_INVALID_CHARS,
-        utf16.data(),
-        static_cast<int>(utf16.size()),
-        nullptr,
-        0,
-        nullptr,
-        nullptr);
-
-    if (size <= 0)
-    {
-        return "";
-    }
-
-    // 分配空间
-    std::vector<char> utf8(size + 1, 0);
-
-    // 执行转换
-    if (0 == WideCharToMultiByte(
-        CP_UTF8,
-        WC_ERR_INVALID_CHARS,
-        utf16.data(),
-        static_cast<int>(utf16.size()),
-        utf8.data(),
-        size,
-        nullptr,
-        nullptr))
-    {
-        return "";
-    }
-
-    return utf8.data();
+    return L"";
 }
 
 bool Application::CreateDevice()
