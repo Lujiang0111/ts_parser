@@ -19,7 +19,6 @@ bool TsParserGui::Init()
         return false;
     }
 
-    gui_ = std::make_shared<Gui>();
     return true;
 }
 
@@ -74,6 +73,12 @@ void TsParserGui::Do()
             {
                 ts_parser_ = nullptr;
             }
+            gui_ = nullptr;
+        }
+
+        if (!gui_)
+        {
+            gui_ = std::make_shared<Gui>();
         }
 
         ImGui::SameLine();
@@ -100,18 +105,21 @@ void TsParserGui::Do()
         // 右侧子页面
         ImGui::BeginChild("Content", ImVec2(0, 0), true);
 
-        switch (gui_->type)
+        if (ts_parser_)
         {
-        case Gui::Types::kMainInfo:
-            ShowMainInfo();
-            break;
+            switch (gui_->type)
+            {
+            case Gui::Types::kMainInfo:
+                ShowMainInfo();
+                break;
 
-        case Gui::Types::kPacketInfo:
-            ShowPacketInfo();
-            break;
+            case Gui::Types::kPacketInfo:
+                ShowPacketInfo();
+                break;
 
-        default:
-            break;
+            default:
+                break;
+            }
         }
 
         ImGui::EndChild();

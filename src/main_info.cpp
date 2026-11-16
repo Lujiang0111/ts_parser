@@ -3,11 +3,6 @@
 
 void TsParserGui::ShowMainInfo()
 {
-    if (!ts_parser_)
-    {
-        return;
-    }
-
     size_t width = 15;
     app::ImGuiTextFmt("{:<{}}", "文件路径：", width);
     ImGui::SameLine();

@@ -6,11 +6,6 @@ constexpr uint8_t kBom[] = { 0xEF, 0xBB, 0xBF };
 
 void TsParserGui::ShowPacketInfo()
 {
-    if (!ts_parser_)
-    {
-        return;
-    }
-
     if (!gui_->packet_info)
     {
         gui_->packet_info = std::make_shared<Gui::PacketInfo>();
