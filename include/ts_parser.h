@@ -2,7 +2,6 @@
 #define TS_PARSER_INCLUDE_TS_PARSER_H_
 
 #include <windows.h>
-#include <deque>
 #include <memory>
 #include <set>
 #include <string>
@@ -131,7 +130,7 @@ public:
     size_t GetFileSize() const;
     size_t GetTsPacketSize() const;
     const std::set<int> &GetPids() const;
-    void GetPidPacket(int pid, std::deque<TsPacket *> &ts_packets);
+    std::vector<TsPacket *> *GetPidPacket(int pid);
 
 private:
     bool OpenFile(const std::wstring &file_path_w);

@@ -100,20 +100,15 @@ const std::set<int> &TsParser::GetPids() const
     return pids_;
 }
 
-void TsParser::GetPidPacket(int pid, std::deque<TsPacket *> &ts_packets)
+std::vector<TsParser::TsPacket *> *TsParser::GetPidPacket(int pid)
 {
-    ts_packets.clear();
-
     auto iter = pid_packet_map_.find(pid);
     if (pid_packet_map_.end() == iter)
     {
-        return;
+        return nullptr;
     }
 
-    for (auto &&ts_packet : *iter->second)
-    {
-        ts_packets.push_back(ts_packet);
-    }
+    return iter->second.get();
 }
 
 bool TsParser::OpenFile(const std::wstring &file_path_w)

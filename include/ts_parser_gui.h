@@ -55,7 +55,7 @@ private:
             std::vector<std::shared_ptr<SubFilter>> sub_filters;
             size_t sub_filter_index = 0;
 
-            std::deque<TsParser::TsPacket *> filtered_packets;
+            std::vector<TsParser::TsPacket *> filtered_packets;
 
             std::vector<std::string> table_column_descriptions;
             size_t table_selected_row = 0;

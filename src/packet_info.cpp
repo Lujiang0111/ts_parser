@@ -204,49 +204,55 @@ void TsParserGui::PreparePacketInfoTable(size_t filter_index, size_t sub_filter_
     packet_info->sub_filter_index = sub_filter_index;
 
     Gui::PacketInfo::Filter *filter = packet_info->filters[packet_info->filter_index].get();
-    ts_parser_->GetPidPacket(filter->pid, packet_info->filtered_packets);
 
-    switch (packet_info->sub_filters[packet_info->sub_filter_index]->type)
+    packet_info->filtered_packets.clear();
+    std::vector<TsParser::TsPacket *> *pid_packet = ts_parser_->GetPidPacket(filter->pid);
+    if (pid_packet)
     {
-    case Gui::PacketInfo::SubFilter::Types::kWorthy:
-    {
-        auto iter = packet_info->filtered_packets.begin();
-        while (packet_info->filtered_packets.end() != iter)
+        packet_info->filtered_packets.reserve(pid_packet->size());
+        switch (packet_info->sub_filters[packet_info->sub_filter_index]->type)
         {
-            TsParser::TsPacket *ts_packet = *iter;
-            if ((ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kError) ||
-                (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPad) ||
-                (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPat) ||
-                (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPmt) ||
-                (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kSdt) ||
-                ((ts_packet->adaptation_field) && (kPcrMod != ts_packet->adaptation_field->pcr)) ||
-                ((ts_packet->payload) && (ts_packet->payload->pes) && (kTsMod != ts_packet->payload->pes->dts)) ||
-                ((ts_packet->payload) && (ts_packet->payload->pes) && (kTsMod != ts_packet->payload->pes->pts)) ||
-                ((ts_packet->payload) && (ts_packet->payload->psi)))
+        case Gui::PacketInfo::SubFilter::Types::kWorthy:
+        {
+            for (auto &&ts_packet : *pid_packet)
             {
-                ++iter;
+                if ((ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kError) ||
+                    (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPad) ||
+                    (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPat) ||
+                    (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kPmt) ||
+                    (ts_packet->type_flags & TsParser::TsPacket::TypeFlags::kSdt) ||
+                    ((ts_packet->adaptation_field) && (kPcrMod != ts_packet->adaptation_field->pcr)) ||
+                    ((ts_packet->payload) && (ts_packet->payload->pes) && (kTsMod != ts_packet->payload->pes->dts)) ||
+                    ((ts_packet->payload) && (ts_packet->payload->pes) && (kTsMod != ts_packet->payload->pes->pts)) ||
+                    ((ts_packet->payload) && (ts_packet->payload->psi)))
+                {
+                    packet_info->filtered_packets.push_back(ts_packet);
+                }
             }
-            else
-            {
-                iter = packet_info->filtered_packets.erase(iter);
-            }
+
+            break;
         }
 
-        break;
-    }
+        default:
+        {
+            for (auto &&ts_packet : *pid_packet)
+            {
+                packet_info->filtered_packets.push_back(ts_packet);
+            }
 
-    default:
-        break;
+            break;
+        }
+        }
     }
 
     packet_info->table_column_descriptions.resize(kTableColumnSize);
     packet_info->table_column_descriptions[0] = fmt::format("{:<10}", "序号");
-    packet_info->table_column_descriptions[1] = fmt::format("{:<13}", "偏移");
+    packet_info->table_column_descriptions[1] = fmt::format("{}", "偏移");
     packet_info->table_column_descriptions[2] = fmt::format("{:<11}", "pid");
     packet_info->table_column_descriptions[3] = fmt::format("{:<6}", "类型");
     packet_info->table_column_descriptions[4] = fmt::format("{:<25}", "pcr");
-    packet_info->table_column_descriptions[5] = fmt::format("{:<10}", "dts");
-    packet_info->table_column_descriptions[6] = fmt::format("{:<10}", "pts");
+    packet_info->table_column_descriptions[5] = fmt::format("{:<20}", "dts");
+    packet_info->table_column_descriptions[6] = fmt::format("{:<20}", "pts");
 
     packet_info->table_selected_row = 0;
     packet_info->table_selected_column = 0;
