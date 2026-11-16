@@ -3,6 +3,7 @@
 #include "app/win32_dx11_app.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#include "resource.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
 
@@ -42,6 +43,24 @@ bool Application::Init(const wchar_t *title, int width, int height)
     wc.hInstance = hinstance_;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpszClassName = kWindowClassName;
+
+    wc.hIcon = (HICON)LoadImageW(
+        hinstance_,
+        MAKEINTRESOURCEW(IDI_APP_ICON),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXICON),
+        GetSystemMetrics(SM_CYICON),
+        LR_SHARED
+    );
+
+    wc.hIconSm = (HICON)LoadImageW(
+        hinstance_,
+        MAKEINTRESOURCEW(IDI_APP_ICON),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON),
+        LR_SHARED
+    );
 
     if (!RegisterClassExW(&wc))
     {

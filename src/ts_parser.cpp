@@ -30,7 +30,7 @@ bool TsParser::Init(const std::wstring &file_path_w)
 
     for (auto &&ts_packet : ts_packets_)
     {
-        pids_.insert(ts_packet->header.pid);
+        pids_.insert(ts_packet->ts_header->pid);
 
         if (pid_packet_map_.end() == pid_packet_map_.find(-2))
         {
@@ -39,12 +39,22 @@ bool TsParser::Init(const std::wstring &file_path_w)
         }
         pid_packet_map_[-2]->push_back(ts_packet.get());
 
-        if (pid_packet_map_.end() == pid_packet_map_.find(ts_packet->header.pid))
+        if (ts_packet->type_flags & TsPacket::TypeFlags::kError)
+        {
+            if (pid_packet_map_.end() == pid_packet_map_.find(-1))
+            {
+                std::shared_ptr<std::vector<TsPacket *>> val = std::make_shared<std::vector<TsPacket *>>();
+                pid_packet_map_.emplace(-1, val);
+            }
+            pid_packet_map_[-1]->push_back(ts_packet.get());
+        }
+
+        if (pid_packet_map_.end() == pid_packet_map_.find(ts_packet->ts_header->pid))
         {
             std::shared_ptr<std::vector<TsPacket *>> val = std::make_shared<std::vector<TsPacket *>>();
-            pid_packet_map_.emplace(ts_packet->header.pid, val);
+            pid_packet_map_.emplace(ts_packet->ts_header->pid, val);
         }
-        pid_packet_map_[ts_packet->header.pid]->push_back(ts_packet.get());
+        pid_packet_map_[ts_packet->ts_header->pid]->push_back(ts_packet.get());
     }
 
     return true;
@@ -90,14 +100,20 @@ const std::set<int> &TsParser::GetPids() const
     return pids_;
 }
 
-std::vector<TsParser::TsPacket *> *TsParser::GetPidPacket(int pid)
+void TsParser::GetPidPacket(int pid, std::deque<TsPacket *> &ts_packets)
 {
+    ts_packets.clear();
+
     auto iter = pid_packet_map_.find(pid);
     if (pid_packet_map_.end() == iter)
     {
-        return nullptr;
+        return;
     }
-    return iter->second.get();
+
+    for (auto &&ts_packet : *iter->second)
+    {
+        ts_packets.push_back(ts_packet);
+    }
 }
 
 bool TsParser::OpenFile(const std::wstring &file_path_w)
@@ -231,28 +247,29 @@ constexpr size_t kTsHeaderSize = 4;
 
 void TsParser::ParseTsPacket(const uint8_t *data, size_t size)
 {
-    std::shared_ptr<TsParser::TsPacket> ts_packet = std::make_shared<TsParser::TsPacket>();
+    std::shared_ptr<TsPacket> ts_packet = std::make_shared<TsPacket>();
     ts_packets_.push_back(ts_packet);
 
-    ts_packet->index = ts_packets_.size() - 1;
+    ts_packet->packet_index = ts_packets_.size() - 1;
     ts_packet->data = data;
     ts_packet->size = size;
 
     const uint8_t *end = ts_packet->data + ts_packet->size;
     const uint8_t *ptr = ts_packet->data;
 
-    if (ptr + kTsHeaderSize >= end)
+    if (ptr + kTsHeaderSize > end)
     {
-        ts_packet->type = TsPacket::Types::kError;
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
         return;
     }
 
-    TsPacket::TsHeader *ts_header = &ts_packet->header;
-    
+    ts_packet->ts_header = std::make_shared<TsPacket::TsHeader>();
+    TsPacket::TsHeader *ts_header = ts_packet->ts_header.get();
+
     ts_header->sync_byte = ptr[0];
     if (0x47 != ts_header->sync_byte)
     {
-        ts_packet->type = TsPacket::Types::kError;
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
         return;
     }
 
@@ -260,9 +277,265 @@ void TsParser::ParseTsPacket(const uint8_t *data, size_t size)
     ts_header->payload_unit_start_indicator = ((ptr[1] >> 6) & 0x01);
     ts_header->transport_priority = ((ptr[1] >> 5) & 0x01);
     ts_header->pid = ((ptr[1] & 0x1f) << 8) + ptr[2];
-    ts_header->transport_scrambling_control = ((ptr[3] >> 6) & 0x03);
-    ts_header->adaption_field_control = ((ptr[3] >> 4) & 0x03);
-    ts_header->continuity_counter = (ptr[3] & 0x0f);
+    if (0x1ff == ts_header->pid)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kPad;
+    }
 
+    ts_header->transport_scrambling_control = ((ptr[3] >> 6) & 0x03);
+    ts_header->adaptation_field_control = ((ptr[3] >> 4) & 0x03);
+    if (0 == ts_header->adaptation_field_control)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+    }
+
+    ts_header->continuity_counter = (ptr[3] & 0x0f);
     ptr += kTsHeaderSize;
+
+    if (ts_header->adaptation_field_control & 0b10)
+    {
+        if (!ParseAdaptionField(ts_packet.get(), ptr))
+        {
+            return;
+        }
+    }
+
+    if (ts_header->adaptation_field_control & 0b01)
+    {
+        ts_packet->payload = std::make_shared<TsPacket::Payload>();
+        ts_packet->payload->data = ptr;
+        ts_packet->payload->size = end - ptr;
+
+        if (ts_header->payload_unit_start_indicator)
+        {
+            if (ptr + 3 > end)
+            {
+                ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+                return;
+            }
+
+            if ((0x00 == ptr[0]) && (0x00 == ptr[1]) && (0x01 == ptr[2]))
+            {
+                if (!ParsePes(ts_packet.get(), ptr))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (!ParsePsi(ts_packet.get(), ptr))
+                {
+                    return;
+                }
+            }
+        }
+
+        if (ptr < end)
+        {
+            ts_packet->payload->rest = std::make_shared<TsPacket::Payload::Rest>();
+            ts_packet->payload->rest->data = ptr;
+            ts_packet->payload->rest->size = end - ptr;
+            ptr = ts_packet->payload->rest->data + ts_packet->payload->rest->size;
+        }
+    }
+
+    if (ptr < end)
+    {
+        ts_packet->undef = std::make_shared<TsPacket::Undefined>();
+        ts_packet->undef->data = ptr;
+        ts_packet->undef->size = end - ptr;
+        ptr = ts_packet->undef->data + ts_packet->undef->size;
+    }
+}
+
+bool TsParser::ParseAdaptionField(TsPacket *ts_packet, const uint8_t *&packet_ptr)
+{
+    const uint8_t *ptr = packet_ptr;
+    const uint8_t *end = ts_packet->data + ts_packet->size;
+
+    ts_packet->adaptation_field = std::make_shared<TsPacket::AdaptationField>();
+    TsPacket::AdaptationField *adaptation_field = ts_packet->adaptation_field.get();
+    adaptation_field->data = ptr;
+
+    adaptation_field->adaptation_field_length = ptr[0];
+    adaptation_field->size = 1 + adaptation_field->adaptation_field_length;
+    if (adaptation_field->data + adaptation_field->size > end)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+
+    ++ptr;
+    if (adaptation_field->adaptation_field_length >= 7)
+    {
+        int pcr_flag = ((ptr[0] >> 4) & 0x01);
+        if (pcr_flag)
+        {
+            ++ptr;
+            adaptation_field->pcr = (static_cast<int64_t>(ptr[0]) << 34) +
+                (static_cast<int64_t>(ptr[1]) << 26) +
+                (static_cast<int64_t>(ptr[2]) << 18) +
+                (static_cast<int64_t>(ptr[3]) << 10) +
+                (static_cast<int64_t>((ptr[4] >> 7) & 0x01) << 9) +
+                (static_cast<int64_t>(ptr[4] & 0x01) << 8) +
+                static_cast<int64_t>(ptr[5]);
+        }
+    }
+
+    packet_ptr = adaptation_field->data + adaptation_field->size;
+    return true;
+}
+
+bool TsParser::ParsePes(TsPacket *ts_packet, const uint8_t *&packet_ptr)
+{
+    const uint8_t *ptr = packet_ptr;
+    const uint8_t *end = ts_packet->data + ts_packet->size;
+
+    ts_packet->payload->pes = std::make_shared<TsPacket::Payload::Pes>();
+    TsPacket::Payload::Pes *pes = ts_packet->payload->pes.get();
+    pes->data = ptr;
+
+    if ((ptr + 3 > end) || (0x00 != ptr[0]) || (0x00 != ptr[1]) || (0x01 != ptr[2]))
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+    ptr += 3;
+
+    if (ptr + 3 > end)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+    pes->stream_id = ptr[0];
+    pes->pes_packet_length = (ptr[1] << 8) + ptr[2];
+    ptr += 3;
+
+    if ((TsPacket::Payload::Pes::StreamIds::kProgramStreamMap != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kPaddingStream != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kPrivateStream2 != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kEcmStream != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kEmmStream != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kProgramStreamDirectory != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kDsmccStream != pes->stream_id) &&
+        (TsPacket::Payload::Pes::StreamIds::kTypeEStream != pes->stream_id))
+    {
+        if (ptr + 3 > end)
+        {
+            ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+            return false;
+        }
+        int pts_dts_flags = ((ptr[1] >> 6) & 0x03);
+        int pes_header_data_length = ptr[2];
+        ptr += 3;
+
+        if (ptr + pes_header_data_length > end)
+        {
+            ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+            return false;
+        }
+        pes->size = ptr + pes_header_data_length - pes->data;
+
+        if (pts_dts_flags & 0b10)
+        {
+            if (ptr + 5 > end)
+            {
+                ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+                return false;
+            }
+
+            pes->pts = (static_cast<int64_t>((ptr[0] >> 1) & 0x07) << 30) +
+                (static_cast<int64_t>(ptr[1]) << 22) +
+                (static_cast<int64_t>((ptr[2] >> 1) & 0x7f) << 15) +
+                (static_cast<int64_t>(ptr[3]) << 7) +
+                static_cast<int64_t>((ptr[4] >> 1) & 0x7f);
+            ptr += 5;
+        }
+
+        if (pts_dts_flags & 0b01)
+        {
+            if (ptr + 5 > end)
+            {
+                ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+                return false;
+            }
+
+            pes->dts = (static_cast<int64_t>((ptr[0] >> 1) & 0x07) << 30) +
+                (static_cast<int64_t>(ptr[1]) << 22) +
+                (static_cast<int64_t>((ptr[2] >> 1) & 0x7f) << 15) +
+                (static_cast<int64_t>(ptr[3]) << 7) +
+                static_cast<int64_t>((ptr[4] >> 1) & 0x7f);
+            ptr += 5;
+        }
+    }
+    else
+    {
+        pes->size = ptr - pes->data;
+    }
+
+    packet_ptr = pes->data + pes->size;
+    return true;
+}
+
+bool TsParser::ParsePsi(TsPacket *ts_packet, const uint8_t *&packet_ptr)
+{
+    const uint8_t *ptr = packet_ptr;
+    const uint8_t *end = ts_packet->data + ts_packet->size;
+
+    if (ptr + 1 > end)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+    int pointer_field = ptr[0];
+    ++ptr;
+    
+    if (ptr + pointer_field > end)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+    ptr += pointer_field;
+
+    ts_packet->payload->psi = std::make_shared<TsPacket::Payload::Psi>();
+    TsPacket::Payload::Psi *psi = ts_packet->payload->psi.get();
+    psi->data = ptr;
+
+    if (ptr + 12 > end)
+    {
+        ts_packet->type_flags |= TsPacket::TypeFlags::kError;
+        return false;
+    }
+
+    psi->table_id = ptr[0];
+    ++ptr;
+    switch (psi->table_id)
+    {
+    case 0x00:
+        ts_packet->type_flags |= TsPacket::TypeFlags::kPat;
+        break;
+    case 0x02:
+        ts_packet->type_flags |= TsPacket::TypeFlags::kPmt;
+        break;
+    case 0x46:
+        ts_packet->type_flags |= TsPacket::TypeFlags::kSdt;
+        break;
+    default:
+        break;
+    }
+
+    psi->section_length = ((ptr[0] & 0x0f) << 8) + ptr[1];
+    ptr += 2;
+
+    if (ptr + psi->section_length > end)
+    {
+        psi->size = end - psi->data;
+    }
+    else
+    {
+        psi->size = ptr + psi->section_length - psi->data;
+    }
+
+    packet_ptr = psi->data + psi->size;
+    return true;
 }

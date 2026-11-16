@@ -15,7 +15,14 @@ endif()
 file(GLOB_RECURSE srcs "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 # 创建可执行文件
-add_executable(${PROJECT_NAME} ${srcs})
+add_executable(${PROJECT_NAME}
+    ${srcs}
+    resources/resource.rc)
+
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_link_options(${PROJECT_NAME} PRIVATE "/ENTRY:mainCRTStartup")
+endif()
 
 set(bin_dir ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set(dep_dir ${CMAKE_CURRENT_BINARY_DIR}/dep)
@@ -54,6 +61,7 @@ message(STATUS "os name=${os_name}, os arch=${os_arch}, build type=${CMAKE_BUILD
 
 # 指定目标的包含目录
 target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/app/imgui
     ${dep_dir}/include/lccl
@@ -102,19 +110,19 @@ set(COPY_CONF_CMD)
 if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/conf")
     set(COPY_CONF_CMD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/conf"
-            "${bin_dir}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/conf"
+        "${bin_dir}"
     )
 endif()
 
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env python3
-        ${CMAKE_CURRENT_SOURCE_DIR}/postbuild.py
-        --os_name ${os_name}
-        --os_arch ${os_arch}
-        --bin_dir ${bin_dir}
-        --lib_base_dir ${postbuild_lib_base_dir}
-        --libs ${postbuild_libs}
+    ${CMAKE_CURRENT_SOURCE_DIR}/postbuild.py
+    --os_name ${os_name}
+    --os_arch ${os_arch}
+    --bin_dir ${bin_dir}
+    --lib_base_dir ${postbuild_lib_base_dir}
+    --libs ${postbuild_libs}
     ${COPY_CONF_CMD}
 )
