@@ -100,6 +100,7 @@ bool Application::Init(const wchar_t *title, int width, int height)
     ImGui::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
+    io.IniFilename = nullptr;
     ImFont *font = io.Fonts->AddFontFromFileTTF(
         "C:/Windows/Fonts/msyh.ttc",
         18.0f
